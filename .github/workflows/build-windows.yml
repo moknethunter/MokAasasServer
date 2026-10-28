@@ -1,0 +1,102 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: Portable ZIP
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Prepare portable folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path portable -Force
+          Copy-Item dist portable\dist -Recurse
+          Copy-Item public portable\public -Recurse
+          Copy-Item package.json portable\package.json
+          Copy-Item .env.example portable\.env.example
+
+      - name: Install production deps in portable
+        shell: pwsh
+        run: |
+          Push-Location portable
+          npm install --omit=dev
+          Pop-Location
+
+      - name: Copy Node.js runtime
+        shell: pwsh
+        run: |
+          $nodePath = (Get-Command node).Source
+          Copy-Item $nodePath portable\node.exe
+          Write-Host "Copied node.exe from: $nodePath"
+
+      - name: Create start.bat
+        shell: pwsh
+        run: |
+          $bat = @"
+          @echo off
+          title MokAasasServer
+          cd /d "%~dp0"
+          echo.
+          echo Starting MokAasasServer...
+          echo.
+          node.exe dist\index.js
+          echo.
+          echo Server stopped. Press any key...
+          pause >nul
+          "@
+          Set-Content -Path portable\start.bat -Value $bat -Encoding ASCII
+
+      - name: Create README in portable
+        shell: pwsh
+        run: |
+          $readme = @"
+          # MokAasasServer - Portable
+
+          ## How to run
+          1. Double-click start.bat
+          2. Open http://localhost:3000
+          3. Login with credentials from .env
+
+          ## First run setup
+          - Copy .env.example to .env
+          - Generate password hash with: npm run hash-password "YourPassword"
+          - Set SESSION_SECRET to any 64-char random string
+          "@
+          Set-Content -Path portable\README.md -Value $readme -Encoding UTF8
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path portable\* -DestinationPath MokAasasServer-Windows.zip -Force
+          $size = [math]::Round((Get-Item MokAasasServer-Windows.zip).Length / 1MB, 1)
+          Write-Host "ZIP size: $size MB"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MokAasasServer-Windows
+          path: MokAasasServer-Windows.zip
+          retention-days: 30
