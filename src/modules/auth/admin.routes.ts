@@ -1,41 +1,37 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { config } from "../../config.js";
+import { Router } from "express";
+import { rateLimit } from "../../middleware/rate-limit.js";
+import { RATE_LIMITS } from "../../shared/constants.js";
+import { verifyCredentials, issueSession, revokeSession, cookieOptions } from "./admin.service.js";
+import { COOKIE_NAME } from "../../shared/constants.js";
+import { logger } from "../../logger.js";
 
-export interface SessionPayload {
-  sub: string;
-  role: "admin";
-  iat?: number;
-  exp?: number;
-}
+export const authRouter = Router();
 
-export async function verifyCredentials(username: string, password: string): Promise<boolean> {
-  if (username !== config.ADMIN_USERNAME) {
-    await bcrypt.compare(password, "$2a$12$invalidhashinvalidhashinvalidhashinvalidhas");
-    return false;
+authRouter.post(
+  "/login",
+  rateLimit({ max: RATE_LIMITS.LOGIN.max, windowMs: RATE_LIMITS.LOGIN.windowMs }),
+  async (req, res) => {
+    const { username, password } = req.body || {};
+    if (typeof username !== "string" || typeof password !== "string") {
+      return res.status(400).json({ error: "username and password required" });
+    }
+
+    const ok = await verifyCredentials(username, password);
+    if (!ok) {
+      logger.warn({ ip: req.ip, username }, "Failed admin login");
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const { token } = await issueSession(username);
+    res.cookie(COOKIE_NAME, token, cookieOptions);
+    logger.info({ ip: req.ip, username }, "Admin login success");
+    res.json({ ok: true, redirect: "/dashboard" });
   }
-  return bcrypt.compare(password, config.ADMIN_PASSWORD_HASH);
-}
+);
 
-export async function issueSession(username: string): Promise<{ token: string }> {
-  const token = jwt.sign({ sub: username, role: "admin" }, config.SESSION_SECRET, {
-    expiresIn: `${config.SESSION_TTL_HOURS}h`,
-  });
-  return { token };
-}
-
-export async function verifySession(token: string): Promise<SessionPayload | null> {
-  try {
-    return jwt.verify(token, config.SESSION_SECRET) as SessionPayload;
-  } catch {
-    return null;
-  }
-}
-
-export const cookieOptions = {
-  httpOnly: true,
-  secure: config.isProd,
-  sameSite: "strict" as const,
-  maxAge: config.SESSION_TTL_HOURS * 60 * 60 * 1000,
-  path: "/",
-};
+authRouter.post("/logout", async (req, res) => {
+  const token = req.cookies?.[COOKIE_NAME] as string | undefined;
+  if (token) await revokeSession(token);
+  res.clearCookie(COOKIE_NAME);
+  res.json({ ok: true });
+});
