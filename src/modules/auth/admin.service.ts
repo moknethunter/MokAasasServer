@@ -1,12 +1,12 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { config } from "../../config.js";
+import type { SessionStore, SessionPayload } from "../../ports/session-store.js";
 
-export interface SessionPayload {
-  sub: string;
-  role: "admin";
-  iat?: number;
-  exp?: number;
+let store: SessionStore | null = null;
+
+export function setSessionStore(s: SessionStore): void {
+  store = s;
 }
 
 export async function verifyCredentials(username: string, password: string): Promise<boolean> {
@@ -18,18 +18,28 @@ export async function verifyCredentials(username: string, password: string): Pro
 }
 
 export async function issueSession(username: string): Promise<{ token: string }> {
-  const token = jwt.sign({ sub: username, role: "admin" }, config.SESSION_SECRET, {
+  if (!store) throw new Error("SessionStore not initialized");
+  const payload: SessionPayload = { sub: username, role: "admin" };
+  const token = jwt.sign(payload, config.SESSION_SECRET, {
     expiresIn: `${config.SESSION_TTL_HOURS}h`,
   });
+  await store.create(token, payload, config.SESSION_TTL_HOURS);
   return { token };
 }
 
 export async function verifySession(token: string): Promise<SessionPayload | null> {
+  if (!store) return null;
+  const stored = await store.get(token);
+  if (!stored) return null;
   try {
     return jwt.verify(token, config.SESSION_SECRET) as SessionPayload;
   } catch {
     return null;
   }
+}
+
+export async function revokeSession(token: string): Promise<void> {
+  if (store) await store.revoke(token);
 }
 
 export const cookieOptions = {
