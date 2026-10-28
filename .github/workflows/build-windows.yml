@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Generate Prisma Client (Crucial Step)
+      - name: Generate Prisma Client
         run: npx prisma generate
 
       - name: Build TypeScript
@@ -42,10 +42,21 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path portable -Force
-          Copy-Item dist portable\dist -Recurse
-          Copy-Item public portable\public -Recurse
-          Copy-Item package.json portable\package.json
-          Copy-Item .env.example portable\.env.example
+          
+          if (Test-Path dist) { 
+            Copy-Item dist portable\dist -Recurse 
+          } else {
+            Write-Error "dist folder missing"; exit 1 
+          }
+          
+          if (Test-Path public) { 
+            Copy-Item public portable\public -Recurse 
+          } else {
+            New-Item -ItemType Directory -Path portable\public -Force
+          }
+          
+          if (Test-Path package.json) { Copy-Item package.json portable\package.json }
+          if (Test-Path .env.example) { Copy-Item .env.example portable\.env.example }
 
       - name: Install production deps in portable
         shell: pwsh
