@@ -10,7 +10,11 @@ import { registry } from './metrics.js';
 import { correlationId } from './middleware/correlation.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { adminOnlyPage } from './middleware/admin-only.js';
 import { healthRouter } from './modules/health/routes.js';
+import { authRouter } from './modules/auth/admin.routes.js';
+import { adminRouter, pushActivity } from './modules/admin/overview.routes.js';
+import { COOKIE_NAME } from './shared/constants.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
@@ -24,18 +28,48 @@ export function createApp(): Express {
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
   app.use(correlationId);
+
+  // Activity capture (للوحة التحكم)
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      if (req.path === '/api/v1/admin/activity') return;
+      pushActivity({
+        ts: new Date().toISOString(),
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        ms: Date.now() - start,
+        ip: req.ip,
+      });
+    });
+    next();
+  });
+
   app.use(requestLogger);
 
-  // Health (live + ready + metrics)
+  // API v1
   app.use('/api/v1', healthRouter);
+  app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/admin', adminRouter);
 
-  // Metrics endpoint (Prometheus)
+  // Metrics
   app.get('/metrics', async (_req, res) => {
     res.set('Content-Type', registry.contentType);
     res.send(await registry.metrics());
   });
 
-  // Static assets (no index fallback — صفحات محمية صراحة)
+  // Pages
+  app.get('/', (req, res) => {
+    const hasSession = Boolean(req.cookies?.[COOKIE_NAME]);
+    res.redirect(hasSession ? '/dashboard' : '/login');
+  });
+
+  app.get('/dashboard', adminOnlyPage, (_req, res) => {
+    res.sendFile(join(publicDir, 'dashboard.html'));
+  });
+
+  // Static assets
   app.use(express.static(publicDir, { index: false }));
 
   // 404
