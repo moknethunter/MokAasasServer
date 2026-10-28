@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# إلغاء التشغيلات القديمة لنفس الفرع لتوفير الوقت
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────
+  # 1. Lint & Typecheck (سريع، بدون DB)
+  # ─────────────────────────────────────────
+  quality:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  # ─────────────────────────────────────────
+  # 2. Tests + Build (مع PostgreSQL)
+  # ─────────────────────────────────────────
+  test-and-build:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/testdb
+      NODE_ENV: test
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD_HASH: $2a$12$testhashplaceholder000000000000000000000000000000000000
+      SESSION_SECRET: test-secret-at-least-32-characters-long-for-ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Prisma Migrations
+        run: npx prisma migrate deploy
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build TypeScript
+        run: npm run build
+
+  # ─────────────────────────────────────────
+  # 3. Security Audit (اختياري)
+  # ─────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+        continue-on-error: true
