@@ -5,46 +5,33 @@ import cookieParser from "cookie-parser";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-// ─── Routers ───
-import { authRouter } from "./modules/auth/auth.routes.js";
-import { provisionRouter } from "./modules/provision/provision.module.js";
-import { numbersRouter } from "./modules/numbers/numbers.module.js";
+// ─── Modules ───
+import { createAuthRoutes } from "./modules/auth/auth.routes.js";
+import { provisionRouter } from "./modules/provision/provision.module.js"; // المسار الصحيح الآن
+import { numbersRouter } from "./modules/numbers/numbers.module.js"; // المسار الصحيح الآن
+import { AuthService } from "./modules/auth/auth.service.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
 
-export function createApp(): Express {
+export function createApp(authService: AuthService): Express {
   const app = express();
 
-  // ═══════════════════════════════════════════════════
-  // 1. Middleware
-  // ═══════════════════════════════════════════════════
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json());
   app.use(cookieParser());
 
   // ═══════════════════════════════════════════════════
-  // 2. API Routes
+  // API Routes
   // ═══════════════════════════════════════════════════
-  // مسارات المصادقة (تسجيل الدخول، إنشاء حساب)
-  app.use("/api/auth", authRouter);
-
-  // مسارات توليد الملف السري (للتطبيقات)
+  app.use("/api/auth", createAuthRoutes(authService));
   app.use("/api/provision", provisionRouter);
-
-  // مسارات إدارة الأرقام (للمدير)
   app.use("/api/numbers", numbersRouter);
 
-  // ═══════════════════════════════════════════════════
-  // 3. Static Files & UI
-  // ═══════════════════════════════════════════════════
+  // Static UI
   app.use(express.static(publicDir));
-
-  // توجيه الصفحة الرئيسية إلى صفحة تسجيل الدخول
-  app.get("/", (_req, res) => {
-    res.redirect("/login.html");
-  });
+  app.get("/", (_req, res) => res.redirect("/login.html"));
 
   return app;
 }
