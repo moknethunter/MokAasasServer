@@ -2,6 +2,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id           String   @id @default(cuid())
+  phoneNumber  String   @unique
+  username     String
+  passwordHash String?
+  secretToken  String   @unique // 🔑 الملف السري
+  role         String   @default("user")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
 datasource db {
   provider = "sqlite"
   url      = "file:./dev.db"
