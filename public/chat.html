@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MokAasasServer · Chat</title>
+<title>MokAsasServer · Chat</title>
 <script src="/socket.io/socket.io.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }
@@ -23,7 +23,7 @@
 </head>
 <body>
   <header>
-    <h2>💬 الشات العام</h2>
+    <h2>💬 MokAsasServer · Chat</h2>
     <span style="color: #00ff9d; font-size: 12px;">متصل</span>
   </header>
   <div id="messages"></div>
@@ -39,22 +39,22 @@
   const input = document.getElementById('msg-input');
   const messages = document.getElementById('messages');
 
-  function appendMessage(data) {
+  function appendMessage(sender, text) {
     const div = document.createElement('div');
     div.classList.add('msg');
-    if (data.sender === username) div.classList.add('me');
-    div.innerHTML = `<div class="sender">${data.sender}</div><div class="text">${data.text || data.content}</div>`;
+    if (sender === username) div.classList.add('me');
+    div.innerHTML = `<div class="sender">${sender}</div><div class="text">${text}</div>`;
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
   }
 
   socket.on('chat history', (history) => {
-    messages.innerHTML = ''; 
-    history.forEach(msg => appendMessage({ sender: msg.sender, text: msg.content }));
+    messages.innerHTML = '';
+    history.forEach(msg => appendMessage(msg.sender, msg.content));
   });
 
   socket.on('chat message', (data) => {
-    appendMessage({ sender: data.sender, text: data.content });
+    appendMessage(data.sender, data.content);
   });
 
   form.addEventListener('submit', (e) => {
