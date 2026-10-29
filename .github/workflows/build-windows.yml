@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
 
     env:
-      DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+      DATABASE_URL: "file:./dev.db"
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD_HASH: $2a$12$testhashplaceholder000000000000000000000000000000000000
       SESSION_SECRET: test-secret-at-least-32-characters-long-for-ci
@@ -35,6 +35,9 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Create SQLite Database
+        run: npx prisma db push
+
       - name: Build TypeScript
         run: npm run build
 
@@ -42,19 +45,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path portable -Force
-          
-          if (Test-Path dist) { 
-            Copy-Item dist portable\dist -Recurse 
-          } else {
-            Write-Error "dist folder missing"; exit 1 
-          }
-          
-          if (Test-Path public) { 
-            Copy-Item public portable\public -Recurse 
-          } else {
-            New-Item -ItemType Directory -Path portable\public -Force
-          }
-          
+          if (Test-Path dist) { Copy-Item dist portable\dist -Recurse }
+          if (Test-Path public) { Copy-Item public portable\public -Recurse }
+          if (Test-Path prisma) { Copy-Item prisma portable\prisma -Recurse }
           if (Test-Path package.json) { Copy-Item package.json portable\package.json }
           if (Test-Path .env.example) { Copy-Item .env.example portable\.env.example }
 
@@ -76,10 +69,10 @@ jobs:
         run: |
           $bat = @"
           @echo off
-          title MokAasasServer
+          title MokAsasServer
           cd /d "%~dp0"
           echo.
-          echo Starting MokAasasServer...
+          echo Starting MokAsasServer...
           echo.
           node.exe dist\index.js
           echo.
@@ -91,11 +84,11 @@ jobs:
       - name: Create ZIP
         shell: pwsh
         run: |
-          Compress-Archive -Path portable\* -DestinationPath MokAasasServer-Windows.zip -Force
+          Compress-Archive -Path portable\* -DestinationPath MokAsasServer-Windows.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MokAasasServer-Windows
-          path: MokAasasServer-Windows.zip
+          name: MokAsasServer-Windows
+          path: MokAsasServer-Windows.zip
           retention-days: 30
