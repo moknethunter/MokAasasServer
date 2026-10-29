@@ -1,9 +1,9 @@
 export type ConnectionHandler = (userId: string) => void;
+export type MessageHandler = (data: any) => void;
 
 export interface ClientConnection {
-  start(server: unknown): void;
-  emit(userId: string, event: string, payload: unknown): void;
+  start(server: any): void;
+  emitToAll(event: string, payload: unknown): void;
   onConnection(handler: ConnectionHandler): void;
-  onDisconnect(handler: ConnectionHandler): void;
-  close(): Promise<void>;
+  onMessage(event: string, handler: MessageHandler): void;
 }
