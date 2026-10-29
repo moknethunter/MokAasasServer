@@ -33,26 +33,30 @@
   </form>
 
 <script>
-  // اسم عشوائي للمستخدم (للتجربة)
   const username = "مستخدم_" + Math.floor(Math.random() * 1000);
   const socket = io();
-
   const form = document.getElementById('chat-form');
   const input = document.getElementById('msg-input');
   const messages = document.getElementById('messages');
 
-  // استقبال الرسائل
-  socket.on('chat message', (data) => {
+  function appendMessage(data) {
     const div = document.createElement('div');
     div.classList.add('msg');
     if (data.sender === username) div.classList.add('me');
-    
-    div.innerHTML = `<div class="sender">${data.sender}</div><div class="text">${data.text}</div>`;
+    div.innerHTML = `<div class="sender">${data.sender}</div><div class="text">${data.text || data.content}</div>`;
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
+  }
+
+  socket.on('chat history', (history) => {
+    messages.innerHTML = ''; 
+    history.forEach(msg => appendMessage({ sender: msg.sender, text: msg.content }));
   });
 
-  // إرسال الرسائل
+  socket.on('chat message', (data) => {
+    appendMessage({ sender: data.sender, text: data.content });
+  });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (input.value) {
