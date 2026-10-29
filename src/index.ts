@@ -1,69 +1,74 @@
-import http from 'node:http';
-import { PrismaClient } from '@prisma/client';
-import qrcode from 'qrcode-terminal';
-import { config } from './config.js';
-import { logger } from './logger.js';
-import { getNetworkInfo } from './network.js';
-import { createApp } from './app.js';
-import { MemorySessionStore } from './adapters/session/memory.js';
-import { PostgresUserRepo } from './adapters/users/postgres.js';
-import { WebSocketConnection } from './adapters/connection/ws.js';
-import { LocalEventBus } from './adapters/events/local.js';
-import { setSessionStore } from './modules/auth/admin.service.js';
-
-// ═══════════════════════════════════════════════════
-//  Composition Root — المكان الوحيد الذي يعرف كل شيء
-// ═══════════════════════════════════════════════════
-const prisma = new PrismaClient();
-const sessionStore = new MemorySessionStore();          // ← استبدل بـ Redis في المرحلة 2
-const userRepo = new PostgresUserRepo(prisma);          // ← ثابت
-const eventBus = new LocalEventBus();                    // ← استبدل بـ Redis في المرحلة 2
-
-setSessionStore(sessionStore);
+import http from "node:http";
+import { Server as SocketIOServer } from "socket.io";
+import { PrismaClient } from "@prisma/client";
+import qrcode from "qrcode-terminal";
+import { config } from "./config.js";
+import { logger } from "./logger.js";
+import { getNetworkInfo } from "./network.js";
+import { createApp } from "./app.js";
 
 const app = createApp();
-const httpServer = http.createServer(app);
+const server = http.createServer(app);
+const prisma = new PrismaClient();
 
-const connection = new WebSocketConnection(httpServer);  // ← جاهز للمرحلة 1
-connection.start(httpServer);
+// إعداد Socket.IO
+const io = new SocketIOServer(server, {
+  cors: { origin: "*" }
+});
 
-// ═══════════════════════════════════════════════════
-//  Graceful Shutdown
-// ═══════════════════════════════════════════════════
-async function shutdown(signal: string): Promise<void> {
-  logger.info(`${signal} — shutting down`);
-  httpServer.close();
-  await connection.close();
-  await eventBus.close();
-  await prisma.$disconnect();
-  process.exit(0);
-}
+io.on("connection", (socket) => {
+  logger.info(`New connection: ${socket.id}`);
+  socket.on("chat message", (data) => {
+    io.emit("chat message", data);
+  });
+});
 
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(sig, () => void shutdown(sig));
-}
+// ⚡ مسار جديد لجلب الإحصائيات الحية
+app.get("/api/v1/admin/stats", async (req, res) => {
+  try {
+    // 1. عدد المتصلين حالياً عبر Socket.IO
+    const activeConnections = io.engine.clientsCount;
+    
+    // 2. عدد المشتركين في قاعدة البيانات (المستخدمين)
+    let totalSubscribers = 0;
+    try {
+      totalSubscribers = await prisma.user.count();
+    } catch (e) {
+      // إذا لم تكن قاعدة البيانات متصلة بعد، نتجاهل الخطأ
+      totalSubscribers = 1; // على الأقل الأدمن
+    }
 
-// ═══════════════════════════════════════════════════
-//  Listen
-// ═══════════════════════════════════════════════════
-httpServer.listen(config.PORT, config.HOST, () => {
+    res.json({
+      activeConnections,
+      totalSubscribers,
+      uptime: Math.floor(process.uptime()),
+      memory: process.memoryUsage(),
+      status: "online"
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+server.listen(config.PORT, config.HOST, () => {
   const urls = getNetworkInfo(config.PORT);
-  logger.info(`🚀 Voice Server v${config.VERSION} [${config.NODE_ENV}]`);
-  logger.info('─'.repeat(50));
+  logger.info(`MokAasasServer v${config.VERSION} [${config.NODE_ENV}]`);
+  logger.info("-".repeat(50));
   for (const { label, url } of urls) {
     logger.info(`${label.padEnd(18)} ${url}`);
   }
-
   const lanUrl = urls[1]?.url;
   if (lanUrl) {
-    logger.info('─'.repeat(50));
-    logger.info(`📱 امسح من هاتفك: ${lanUrl}`);
+    logger.info("-".repeat(50));
+    logger.info(`Scan from phone: ${lanUrl}`);
     qrcode.generate(lanUrl, { small: true }, (qr) => console.log(qr));
   }
-
-  logger.info('─'.repeat(50));
-  logger.info(`Features: ${JSON.stringify(config.features)}`);
 });
 
-// references صريحة لتفادي noUnusedLocals
-export { userRepo, eventBus };
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, () => {
+    logger.info(`${sig} received, shutting down`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 5000).unref();
+  });
+}
