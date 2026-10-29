@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 // ─── Modules ───
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
 import { provisionRouter } from "./modules/provision/provision.module.js";
-import { numbersRouter } from "./modules/numbers/numbers.module.js";
+import { numbersRouter } from "./modules/numbers/number.module.js";
 import { AuthService } from "./modules/auth/auth.service.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
