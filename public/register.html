@@ -6,8 +6,9 @@
 </head>
 <body>
 <div class="card">
-  <h2 style="text-align:center;color:#00d9ff;">تسجيل حساب جديد</h2>
-  <input type="text" id="u" placeholder="اسم المستخدم">
+  <h2 style="text-align:center;color:#00d9ff;">تسجيل على الشبكة</h2>
+  <input type="text" id="phone" placeholder="رقم الهاتف (مثال: 770000000)">
+  <input type="text" id="name" placeholder="الاسم المعروض">
   <input type="password" id="p" placeholder="كلمة المرور">
   <button onclick="register()">إنشاء الحساب</button>
   <div class="err" id="e"></div>
@@ -15,17 +16,19 @@
 </div>
 <script>
 async function register() {
-  const u = document.getElementById('u').value;
+  const phone = document.getElementById('phone').value;
+  const name = document.getElementById('name').value;
   const p = document.getElementById('p').value;
   const res = await fetch('/api/auth/register', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({username: u, password: p})
+    body: JSON.stringify({phoneNumber: phone, username: name, password: p})
   });
   const data = await res.json();
   if (res.ok) {
     localStorage.setItem('token', data.token);
-    localStorage.setItem('username', u);
-    window.location.href = '/chat.html';
+    localStorage.setItem('phone', phone);
+    localStorage.setItem('name', name);
+    window.location.href = '/dashboard.html';
   } else {
     const e = document.getElementById('e'); e.textContent = data.error; e.style.display = 'block';
   }
