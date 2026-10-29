@@ -7,22 +7,22 @@ export class AuthService {
     private tokenService: TokenService
   ) {}
 
-  async register(username: string, password: string) {
-    const existing = await this.userRepo.findByUsername(username);
-    if (existing) throw new Error("اسم المستخدم موجود بالفعل");
+  async register(phoneNumber: string, username: string, password: string) {
+    const existing = await this.userRepo.findByPhone(phoneNumber);
+    if (existing) throw new Error("رقم الهاتف مسجل بالفعل على الشبكة");
 
     const passwordHash = await this.hasher.hash(password);
-    const user = await this.userRepo.createUser(username, passwordHash);
-    return this.tokenService.sign({ username: user.username, role: user.role });
+    const user = await this.userRepo.createUser(phoneNumber, username, passwordHash);
+    return this.tokenService.sign({ phone: user.phoneNumber, name: user.username, role: user.role });
   }
 
-  async login(username: string, password: string) {
-    const user = await this.userRepo.findByUsername(username);
-    if (!user) throw new Error("بيانات الدخول غير صحيحة");
+  async login(phoneNumber: string, password: string) {
+    const user = await this.userRepo.findByPhone(phoneNumber);
+    if (!user) throw new Error("رقم الهاتف غير مسجل على الشبكة");
 
     const isValid = await this.hasher.compare(password, user.passwordHash);
-    if (!isValid) throw new Error("بيانات الدخول غير صحيحة");
+    if (!isValid) throw new Error("كلمة المرور غير صحيحة");
 
-    return this.tokenService.sign({ username: user.username, role: user.role });
+    return this.tokenService.sign({ phone: user.phoneNumber, name: user.username, role: user.role });
   }
 }
