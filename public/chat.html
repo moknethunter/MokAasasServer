@@ -8,70 +8,63 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }
   body { background: #050814; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-  header { background: #0a1020; padding: 15px; border-bottom: 1px solid #142038; display: flex; justify-content: space-between; align-items: center;}
-  h2 { color: #00d9ff; font-size: 18px; }
+  header { background: #0a1020; padding: 15px; border-bottom: 1px solid #142038; display: flex; justify-content: space-between; }
   #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
   .msg { background: #0a1020; border: 1px solid #142038; padding: 10px 15px; border-radius: 8px; max-width: 80%; align-self: flex-start; }
   .msg.me { background: rgba(0, 217, 255, 0.1); border-color: #00d9ff; align-self: flex-end; }
-  .msg .sender { font-size: 11px; color: #6b7794; margin-bottom: 4px; }
-  .msg .text { font-size: 14px; }
   form { background: #0a1020; padding: 15px; display: flex; gap: 10px; border-top: 1px solid #142038; }
-  input { flex: 1; padding: 12px; background: #050814; border: 1px solid #142038; border-radius: 8px; color: #fff; outline: none; }
-  input:focus { border-color: #00d9ff; }
+  input { flex: 1; padding: 12px; background: #050814; border: 1px solid #142038; border-radius: 8px; color: #fff; }
   button { padding: 12px 20px; background: #00d9ff; border: none; border-radius: 8px; color: #000; font-weight: bold; cursor: pointer; }
 </style>
 </head>
 <body>
   <header>
-    <h2>💬 MokAsasServer · Chat</h2>
-    <a href="/login.html" onclick="localStorage.clear()" style="color:#ff3366;font-size:12px;text-decoration:none;">خروج</a>
+    <h2>💬 محادثة مع: <span id="targetName" style="color:#00ff9d"></span></h2>
+    <a href="/dashboard.html" style="color:#ff3366;text-decoration:none;">رجوع</a>
   </header>
   <div id="messages"></div>
   <form id="chat-form">
-    <input type="text" id="msg-input" placeholder="اكتب رسالتك هنا..." autocomplete="off" required>
+    <input type="text" id="msg-input" placeholder="اكتب رسالتك هنا..." required>
     <button type="submit">إرسال</button>
   </form>
 
 <script>
   const token = localStorage.getItem('token');
-  const username = localStorage.getItem('username');
-  
-  if (!token) window.location.href = '/login.html';
+  const myPhone = localStorage.getItem('phone');
+  const targetPhone = new URLSearchParams(window.location.search).get('target');
+  document.getElementById('targetName').textContent = targetPhone;
 
-  // الاتصال بالسيرفر مع إرسال التوكن
+  if (!token || !targetPhone) window.location.href = '/dashboard.html';
+
   const socket = io({ auth: { token } });
-  
   const form = document.getElementById('chat-form');
   const input = document.getElementById('msg-input');
   const messages = document.getElementById('messages');
 
-  socket.on('connect_error', () => {
-    localStorage.clear();
-    window.location.href = '/login.html';
-  });
-
-  function appendMessage(sender, text) {
+  function appendMessage(senderPhone, text) {
     const div = document.createElement('div');
     div.classList.add('msg');
-    if (sender === username) div.classList.add('me');
-    div.innerHTML = `<div class="sender">${sender}</div><div class="text">${text}</div>`;
+    if (senderPhone === myPhone) div.classList.add('me');
+    div.innerHTML = `<div style="font-size:10px;color:#6b7794">${senderPhone}</div><div>${text}</div>`;
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
   }
 
-  socket.on('chat history', (history) => {
-    messages.innerHTML = '';
-    history.forEach(msg => appendMessage(msg.sender, msg.content));
+  socket.on('chat message', (data) => {
+    if ((data.senderId === myPhone && data.targetId === targetPhone) || 
+        (data.senderId === targetPhone && data.targetId === myPhone)) {
+      appendMessage(data.senderId, data.content);
+    }
   });
 
-  socket.on('chat message', (data) => {
-    appendMessage(data.sender, data.content);
+  socket.on('chat:error', (data) => {
+    alert(data.message);
   });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (input.value) {
-      socket.emit('chat message', { text: input.value });
+      socket.emit('chat message', { target: targetPhone, text: input.value });
       input.value = '';
     }
   });
