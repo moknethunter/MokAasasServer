@@ -3,23 +3,75 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // يمكنك تغييرها إلى "postgresql" لاحقاً لدعم 10 آلاف مستخدم
+  // 💡 ملاحظة هامة: SQLite مجاني ومثالي للبداية (يدعم حتى آلاف المستخدمين).
+  // عندما تريد الترقية إلى 10,000+ مستخدم، غيّر السطر التالي إلى "postgresql" فقط.
+  provider = "sqlite"
   url      = "file:./dev.db"
 }
 
+// 👤 جدول المستخدمين (المشتركين في الشبكة)
 model User {
   id           String   @id @default(cuid())
-  phoneNumber  String   @unique // رقم الهاتف للاتصال
-  username     String   // الاسم المعروض
+  phoneNumber  String   @unique // رقم الهاتف هو المعرف الأساسي
+  username     String
   passwordHash String
-  role         String   @default("user")
+  role         String   @default("user") // admin | user
+  isActive     Boolean  @default(true)   // لتفعيل/إيقاف الرقم
   createdAt    DateTime @default(now())
+
+  // علاقات الربط
+  devices      Device[]
+  sentMessages Message[] @relation("SentMessages")
+  recvMessages Message[] @relation("ReceivedMessages")
+  callsMade    CallLog[] @relation("Caller")
+  callsReceived CallLog[] @relation("Callee")
+
+  @@index([phoneNumber])
 }
 
+// 📱 جدول الأجهزة (لربط التطبيقات)
+// هذا الجدول يسمح لمستخدم واحد بتسجيل الدخول من أكثر من هاتف أو جهاز كمبيوتر.
+model Device {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceToken  String   @unique // معرف فريد للجهاز (لمراسلة التطبيق لاحقاً - Push Notifications)
+  deviceType   String   // android | ios | windows | web
+  lastSeenAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+// 💬 جدول الرسائل
 model Message {
-  id        String   @id @default(cuid())
-  content   String
-  senderId  String   // رقم المرسل
-  targetId  String   // رقم المستقبل
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  content      String
+  senderPhone  String   // رقم المرسل
+  targetPhone  String   // رقم المستقبل
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  // ربط الرسالة بجدول المستخدمين لضمان سلامة البيانات
+  sender       User     @relation("SentMessages", fields: [senderPhone], references: [phoneNumber], onDelete: Cascade)
+  receiver     User     @relation("ReceivedMessages", fields: [targetPhone], references: [phoneNumber], onDelete: Cascade)
+
+  @@index([senderPhone, targetPhone])
+  @@index([createdAt])
+}
+
+// 📞 جدول سجل المكالمات
+model CallLog {
+  id           String   @id @default(cuid())
+  callerPhone  String   // المتصل
+  calleePhone  String   // المتصل به
+  status       String   // answered | missed | rejected
+  duration     Int      @default(0) // مدة المكالمة بالثواني
+  startedAt    DateTime @default(now())
+  endedAt      DateTime?
+
+  caller       User     @relation("Caller", fields: [callerPhone], references: [phoneNumber], onDelete: Cascade)
+  callee       User     @relation("Callee", fields: [calleePhone], references: [phoneNumber], onDelete: Cascade)
+
+  @@index([callerPhone, calleePhone])
 }
