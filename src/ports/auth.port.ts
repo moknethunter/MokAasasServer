@@ -1,13 +1,14 @@
 export interface UserRecord {
   id: string;
+  phoneNumber: string;
   username: string;
   passwordHash: string;
   role: string;
 }
 
 export interface UserRepository {
-  findByUsername(username: string): Promise<UserRecord | null>;
-  createUser(username: string, passwordHash: string, role?: string): Promise<UserRecord>;
+  findByPhone(phoneNumber: string): Promise<UserRecord | null>;
+  createUser(phoneNumber: string, username: string, passwordHash: string): Promise<UserRecord>;
 }
 
 export interface PasswordHasher {
