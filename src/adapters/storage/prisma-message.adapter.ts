@@ -11,9 +11,9 @@ export class PrismaMessageAdapter implements MessageStore {
     });
   }
 
-  async saveMessage(sender: string, content: string): Promise<MessageRecord> {
+  async saveMessage(senderId: string, targetId: string, content: string): Promise<MessageRecord> {
     return prisma.message.create({
-      data: { sender, content },
+      data: { senderId, targetId, content },
     });
   }
 }
