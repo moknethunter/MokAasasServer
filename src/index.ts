@@ -1,23 +1,39 @@
 import http from "node:http";
-import { Server as SocketIOServer } from "socket.io";
 import qrcode from "qrcode-terminal";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { getNetworkInfo } from "./network.js";
 import { createApp } from "./app.js";
-import { setupChatGateway } from "./modules/chat/chat.gateway.js"; // <- الوحدة الجديدة
+
+// Adapters
+import { SocketIOAdapter } from "./adapters/connection/socket-io.adapter.js";
+import { PrismaMessageAdapter } from "./adapters/storage/prisma-message.adapter.js";
+
+// Modules
+import { ChatService } from "./modules/chat/chat.service.js";
 
 const app = createApp();
 const server = http.createServer(app);
-const io = new SocketIOServer(server, { cors: { origin: "*" } });
 
-// تفعيل وحدة الشات
-setupChatGateway(io);
+// Dependency Injection
+const connection = new SocketIOAdapter();
+connection.start(server);
+
+const messageStore = new PrismaMessageAdapter();
+const chatService = new ChatService(messageStore, connection);
+chatService.setup();
 
 server.listen(config.PORT, config.HOST, () => {
   const urls = getNetworkInfo(config.PORT);
-  logger.info(`MokAasasServer v${config.VERSION} [${config.NODE_ENV}]`);
-  for (const { label, url } of urls) logger.info(`${label.padEnd(18)} ${url}`);
+  logger.info(`MokAsasServer v${config.VERSION} (Phase 2)`);
+  logger.info("-".repeat(50));
+  for (const { label, url } of urls) {
+    logger.info(`${label.padEnd(18)} ${url}`);
+  }
   const lanUrl = urls[1]?.url;
-  if (lanUrl) qrcode.generate(lanUrl, { small: true }, (qr) => console.log(qr));
+  if (lanUrl) {
+    logger.info("-".repeat(50));
+    logger.info(`Scan from phone: ${lanUrl}`);
+    qrcode.generate(lanUrl, { small: true }, (qr) => console.log(qr));
+  }
 });
