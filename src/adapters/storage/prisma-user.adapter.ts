@@ -4,13 +4,13 @@ import { UserRepository, UserRecord } from "../../ports/auth.port.js";
 const prisma = new PrismaClient();
 
 export class PrismaUserAdapter implements UserRepository {
-  async findByUsername(username: string): Promise<UserRecord | null> {
-    return prisma.user.findUnique({ where: { username } });
+  async findByPhone(phoneNumber: string): Promise<UserRecord | null> {
+    return prisma.user.findUnique({ where: { phoneNumber } });
   }
 
-  async createUser(username: string, passwordHash: string, role: string = "user"): Promise<UserRecord> {
+  async createUser(phoneNumber: string, username: string, passwordHash: string): Promise<UserRecord> {
     return prisma.user.create({
-      data: { username, passwordHash, role },
+      data: { phoneNumber, username, passwordHash },
     });
   }
 }
