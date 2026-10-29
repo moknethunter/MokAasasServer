@@ -12,12 +12,11 @@ model User {
   phoneNumber  String   @unique
   username     String
   passwordHash String?
-  secretToken  String   @unique
+  secretToken  String   @unique @default(uuid()) // التعديل هنا
   role         String   @default("user")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 }
-
 model Message {
   id        String   @id @default(cuid())
   content   String
