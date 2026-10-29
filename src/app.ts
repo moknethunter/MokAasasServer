@@ -1,4 +1,5 @@
 import express from "express";
+import { numbersRouter } from "./modules/numbers/numbers.module.js";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -16,7 +17,7 @@ export function createApp(authService: AuthService) {
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json());
   app.use(cookieParser());
-
+app.use("/api/numbers", numbersRouter);
   app.use("/api/auth", createAuthRoutes(authService));
   app.use(express.static(publicDir));
   
