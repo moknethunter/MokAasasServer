@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><title>دخول - MokAsasServer</title>
+<style>body{background:#050814;color:#fff;font-family:sans-serif;display:grid;place-items:center;height:100vh;margin:0} .card{background:#0a1020;padding:30px;border-radius:12px;border:1px solid #142038;width:300px} input{width:100%;padding:10px;margin:10px 0;background:#050814;border:1px solid #142038;color:#fff;border-radius:6px} button{width:100%;padding:10px;background:#00d9ff;border:none;border-radius:6px;font-weight:bold;cursor:pointer} .err{color:red;font-size:12px;margin-top:10px;display:none}</style>
+</head>
+<body>
+<div class="card">
+  <h2 style="text-align:center;color:#00d9ff;">تسجيل الدخول</h2>
+  <input type="text" id="u" placeholder="اسم المستخدم">
+  <input type="password" id="p" placeholder="كلمة المرور">
+  <button onclick="login()">دخول</button>
+  <div class="err" id="e"></div>
+  <p style="text-align:center;font-size:12px;margin-top:15px;"><a href="/register.html" style="color:#6b7794;">ليس لديك حساب؟ سجل الآن</a></p>
+</div>
+<script>
+async function login() {
+  const u = document.getElementById('u').value;
+  const p = document.getElementById('p').value;
+  const res = await fetch('/api/auth/login', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({username: u, password: p})
+  });
+  const data = await res.json();
+  if (res.ok) {
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('username', u);
+    window.location.href = '/chat.html';
+  } else {
+    const e = document.getElementById('e'); e.textContent = data.error; e.style.display = 'block';
+  }
+}
+</script>
+</body>
+</html>
