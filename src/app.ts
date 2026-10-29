@@ -13,13 +13,15 @@ import { errorHandler } from './middleware/error-handler.js';
 import { adminOnlyPage } from './middleware/admin-only.js';
 import { healthRouter } from './modules/health/routes.js';
 import { authRouter } from './modules/auth/admin.routes.js';
+import { createAuthRoutes } from './modules/auth/auth.routes.js';
 import { adminRouter, pushActivity } from './modules/admin/overview.routes.js';
 import { COOKIE_NAME } from './shared/constants.js';
+import { AuthService } from './modules/auth/auth.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 
-export function createApp(): Express {
+export function createApp(authService: AuthService): Express {
   const app = express();
 
   app.set('trust proxy', 1);
@@ -30,15 +32,15 @@ export function createApp(): Express {
   app.use(correlationId);
 
   // Activity capture (للوحة التحكم)
-  app.use((req, res, next) => {
+  app.use((req, _res, next) => {
     const start = Date.now();
-    res.on('finish', () => {
+    _res.on('finish', () => {
       if (req.path === '/api/v1/admin/activity') return;
       pushActivity({
         ts: new Date().toISOString(),
         method: req.method,
         path: req.path,
-        status: res.statusCode,
+        status: _res.statusCode,
         ms: Date.now() - start,
         ip: req.ip,
       });
@@ -48,9 +50,10 @@ export function createApp(): Express {
 
   app.use(requestLogger);
 
-  // API v1
+  // API v1 - كل الراوترات هنا
   app.use('/api/v1', healthRouter);
-  app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/auth', authRouter); // القديم
+  app.use('/api/auth', createAuthRoutes(authService)); // الجديد بـ AuthService
   app.use('/api/v1/admin', adminRouter);
 
   // Metrics
@@ -59,9 +62,9 @@ export function createApp(): Express {
     res.send(await registry.metrics());
   });
 
-  // Pages
+  // Pages - لا يدخلها إلا المدير
   app.get('/', (req, res) => {
-    const hasSession = Boolean(req.cookies?.[COOKIE_NAME]);
+    const hasSession = Boolean((req.cookies as any)?.[COOKIE_NAME]);
     res.redirect(hasSession ? '/dashboard' : '/login');
   });
 
