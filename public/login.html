@@ -6,26 +6,27 @@
 </head>
 <body>
 <div class="card">
-  <h2 style="text-align:center;color:#00d9ff;">تسجيل الدخول</h2>
-  <input type="text" id="u" placeholder="اسم المستخدم">
+  <h2 style="text-align:center;color:#00d9ff;">دخول الشبكة</h2>
+  <input type="text" id="phone" placeholder="رقم الهاتف">
   <input type="password" id="p" placeholder="كلمة المرور">
   <button onclick="login()">دخول</button>
   <div class="err" id="e"></div>
-  <p style="text-align:center;font-size:12px;margin-top:15px;"><a href="/register.html" style="color:#6b7794;">ليس لديك حساب؟ سجل الآن</a></p>
+  <p style="text-align:center;font-size:12px;margin-top:15px;"><a href="/register.html" style="color:#6b7794;">تسجيل جديد</a></p>
 </div>
 <script>
 async function login() {
-  const u = document.getElementById('u').value;
+  const phone = document.getElementById('phone').value;
   const p = document.getElementById('p').value;
   const res = await fetch('/api/auth/login', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({username: u, password: p})
+    body: JSON.stringify({phoneNumber: phone, password: p})
   });
   const data = await res.json();
   if (res.ok) {
     localStorage.setItem('token', data.token);
-    localStorage.setItem('username', u);
-    window.location.href = '/chat.html';
+    localStorage.setItem('phone', phone);
+    localStorage.setItem('name', data.name || 'مستخدم');
+    window.location.href = '/dashboard.html';
   } else {
     const e = document.getElementById('e'); e.textContent = data.error; e.style.display = 'block';
   }
