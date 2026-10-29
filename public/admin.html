@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MokAsasServer · إدارة الأرقام</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }
+  body { background: #050814; color: #fff; padding: 20px; }
+  .container { max-width: 800px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #142038; padding-bottom: 15px; }
+  h1 { color: #00d9ff; font-size: 22px; }
+  .card { background: #0a1020; border: 1px solid #142038; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .form-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+  input { flex: 1; min-width: 150px; padding: 12px; background: #050814; border: 1px solid #142038; border-radius: 8px; color: #fff; }
+  input:focus { outline: none; border-color: #00d9ff; }
+  button { padding: 12px 25px; background: #00d9ff; border: none; border-radius: 8px; color: #000; font-weight: bold; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: right; padding: 12px; border-bottom: 1px solid #142038; }
+  th { color: #6b7794; font-size: 12px; }
+  .msg { padding: 10px; border-radius: 8px; margin-bottom: 15px; display: none; }
+  .msg.success { background: rgba(0,255,157,0.1); color: #00ff9d; display: block; }
+  .msg.error { background: rgba(255,51,102,0.1); color: #ff3366; display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📡 إدارة أرقام الشبكة</h1>
+    <a href="/dashboard.html" style="color: #6b7794; text-decoration: none;">← رجوع</a>
+  </header>
+
+  <div id="alert" class="msg"></div>
+
+  <div class="card">
+    <h2 style="margin-bottom: 15px; color: #00d9ff;">إضافة رقم جديد (توزيع)</h2>
+    <div class="form-row">
+      <input type="text" id="phone" placeholder="رقم الهاتف">
+      <input type="text" id="name" placeholder="اسم المشترك">
+      <input type="password" id="password" placeholder="كلمة المرور">
+      <button onclick="addNumber()">توزيع الرقم</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom: 15px; color: #00d9ff;">الأرقام الموزعة</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>الرقم</th>
+          <th>الاسم</th>
+          <th>تاريخ التسجيل</th>
+        </tr>
+      </thead>
+      <tbody id="users-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const alertBox = document.getElementById('alert');
+
+  function showAlert(msg, isError = false) {
+    alertBox.textContent = msg;
+    alertBox.className = `msg ${isError ? 'error' : 'success'}`;
+    setTimeout(() => { alertBox.className = 'msg'; }, 4000);
+  }
+
+  async function loadNumbers() {
+    const res = await fetch('/api/numbers/users');
+    const users = await res.json();
+    const table = document.getElementById('users-table');
+    if (users.length === 0) {
+      table.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#6b7794;">لا توجد أرقام بعد.</td></tr>';
+      return;
+    }
+    table.innerHTML = users.map(u => `
+      <tr>
+        <td style="color: #00d9ff; font-family: monospace;">${u.phoneNumber}</td>
+        <td>${u.username}</td>
+        <td style="color: #6b7794; font-size: 12px;">${new Date(u.createdAt).toLocaleDateString('ar')}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function addNumber() {
+    const phoneNumber = document.getElementById('phone').value;
+    const username = document.getElementById('name').value;
+    const password = document.getElementById('password').value;
+
+    const res = await fetch('/api/numbers/provision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber, username, password })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAlert(data.message);
+      document.getElementById('phone').value = '';
+      document.getElementById('name').value = '';
+      document.getElementById('password').value = '';
+      loadNumbers();
+    } else {
+      showAlert(data.error, true);
+    }
+  }
+
+  loadNumbers();
+</script>
+</body>
+</html>
