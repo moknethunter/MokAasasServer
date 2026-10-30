@@ -1,24 +1,21 @@
-name: Build Windows
+name: Build Windows EXE
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  portable:
-    name: Portable ZIP
+  build:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     env:
-      DATABASE_URL: "file:./dev.db"
+      DATABASE_URL: "file:./prisma/dev.db"
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD_HASH: $2a$12$testhashplaceholder000000000000000000000000000000000000
       SESSION_SECRET: test-secret-at-least-32-characters-long-for-ci
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -41,54 +38,14 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      - name: Prepare portable folder
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path portable -Force
-          if (Test-Path dist) { Copy-Item dist portable\dist -Recurse }
-          if (Test-Path public) { Copy-Item public portable\public -Recurse }
-          if (Test-Path prisma) { Copy-Item prisma portable\prisma -Recurse }
-          if (Test-Path package.json) { Copy-Item package.json portable\package.json }
-          if (Test-Path .env.example) { Copy-Item .env.example portable\.env.example }
+      - name: Build Electron EXE
+        run: npm run dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install production deps in portable
-        shell: pwsh
-        run: |
-          Push-Location portable
-          npm install --omit=dev
-          Pop-Location
-
-      - name: Copy Node.js runtime
-        shell: pwsh
-        run: |
-          $nodePath = (Get-Command node).Source
-          Copy-Item $nodePath portable\node.exe
-
-      - name: Create start.bat
-        shell: pwsh
-        run: |
-          $bat = @"
-          @echo off
-          title MokAsasServer
-          cd /d "%~dp0"
-          echo.
-          echo Starting MokAsasServer...
-          echo.
-          node.exe dist\index.js
-          echo.
-          echo Server stopped. Press any key...
-          pause >nul
-          "@
-          Set-Content -Path portable\start.bat -Value $bat -Encoding ASCII
-
-      - name: Create ZIP
-        shell: pwsh
-        run: |
-          Compress-Archive -Path portable\* -DestinationPath MokAsasServer-Windows.zip -Force
-
-      - name: Upload artifact
+      - name: Upload EXE Installer
         uses: actions/upload-artifact@v4
         with:
-          name: MokAsasServer-Windows
-          path: MokAsasServer-Windows.zip
+          name: MokAsasServer-Setup
+          path: release/*.exe
           retention-days: 30
