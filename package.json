@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "main": "electron-main.cjs",
+  "description": "MokAsas Server - Telecom Grade Communications",
+  "author": "MokNethunter",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -10,9 +13,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts || echo 'no test files'",
-    "hash-password": "tsx scripts/hash-password.ts"
+    "electron": "electron .",
+    "dist": "electron-builder --win nsis"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
@@ -37,8 +39,40 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.16.0",
     "@types/qrcode-terminal": "^0.12.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "prisma": "^5.20.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.2"
+  },
+  "build": {
+    "appId": "com.mokasas.server",
+    "productName": "MokAsasServer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "public/**/*",
+      "electron-main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "prisma/dev.db",
+        "to": "dev.db"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/@prisma/client/**",
+      "node_modules/.prisma/**"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
